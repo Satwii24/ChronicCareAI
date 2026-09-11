@@ -1,0 +1,39 @@
+{
+  "name": "ChronicCare AI",
+  "version": "1.0.0",
+  "description": "AI agent for chronic disease monitoring using IBM watsonx.ai and IBM Granite 4-H Small.",
+  "problem_statement": "AI Agent for Chronic Disease Monitoring",
+  "domain": "Healthcare and Artificial Intelligence",
+  "technologies": [
+    "IBM Cloud",
+    "IBM watsonx.ai",
+    "IBM Granite 4-H Small",
+    "Python",
+    "Flask",
+    "Pandas",
+    "HTML",
+    "CSS",
+    "JavaScript",
+    "Chart.js"
+  ],
+  "ai_model": "ibm/granite-4-h-small",
+  "ai_platform": "IBM watsonx.ai",
+  "application_type": "Web Application",
+  "entry_point": "app.py",
+  "features": [
+    "Patient health monitoring",
+    "Risk assessment",
+    "Health trend detection",
+    "AI-generated health summaries",
+    "Medication adherence reminders",
+    "Patient dashboard",
+    "Provider dashboard",
+    "Monitoring alerts"
+  ],
+  "safety": {
+    "uses_synthetic_data": true,
+    "medical_diagnosis": false,
+    "medication_prescription": false,
+    "automatic_dose_changes": false
+  }
+}
