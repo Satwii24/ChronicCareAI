@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>ChronicCare AI</title>
+
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: #f4f7fb;
+            margin: 0;
+            padding: 0;
+        }
+
+        header {
+            background: #123c69;
+            color: white;
+            padding: 20px 40px;
+        }
+
+        header h1 {
+            margin: 0;
+        }
+
+        .container {
+            width: 90%;
+            max-width: 1100px;
+            margin: 30px auto;
+        }
+
+        .card {
+            background: white;
+            padding: 25px;
+            margin-bottom: 20px;
+            border-radius: 12px;
+            box-shadow: 0 3px 10px rgba(0,0,0,0.08);
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 15px;
+        }
+
+        label {
+            font-weight: bold;
+            display: block;
+            margin-bottom: 5px;
+        }
+
+        input, select {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 6px;
+            box-sizing: border-box;
+        }
+
+        button {
+            background: #123c69;
+            color: white;
+            border: none;
+            padding: 13px 25px;
+            border-radius: 7px;
+            cursor: pointer;
+            margin-top: 20px;
+            font-size: 16px;
+        }
+
+        button:hover {
+            background: #0b2d50;
+        }
+
+        #result {
+            display: none;
+        }
+
+        .risk {
+            font-size: 28px;
+            font-weight: bold;
+        }
+
+        .warning {
+            margin: 8px 0;
+        }
+
+        #aiResponse {
+            white-space: pre-wrap;
+            line-height: 1.6;
+        }
+
+        @media(max-width: 700px) {
+            .grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+<header>
+    <h1>ChronicCare AI</h1>
+    <p>AI-Powered Chronic Disease Monitoring System</p>
+</header>
+
+<div class="container">
+
+    <div class="card">
+        <h2>Patient Health Data</h2>
+
+        <div class="grid">
+
+            <div>
+                <label>Patient ID</label>
+                <input id="patient_id" value="P001">
+            </div>
+
+            <div>
+                <label>Age</label>
+                <input id="age" type="number" value="45">
+            </div>
+
+            <div>
+                <label>Condition</label>
+                <select id="condition">
+                    <option>Diabetes</option>
+                    <option>Hypertension</option>
+                    <option>Heart Condition</option>
+                </select>
+            </div>
+
+            <div>
+                <label>Glucose</label>
+                <input id="glucose" type="number" value="185">
+            </div>
+
+            <div>
+                <label>Systolic BP</label>
+                <input id="systolic_bp" type="number" value="145">
+            </div>
+
+            <div>
+                <label>Diastolic BP</label>
+                <input id="diastolic_bp" type="number" value="92">
+            </div>
+
+            <div>
+                <label>Heart Rate</label>
+                <input id="heart_rate" type="number" value="91">
+            </div>
+
+            <div>
+                <label>Sleep Hours</label>
+                <input id="sleep_hours" type="number" step="0.1" value="5.5">
+            </div>
+
+            <div>
+                <label>Medication Adherence</label>
+                <select id="medication_adherence">
+                    <option>Taken</option>
+                    <option>Missed</option>
+                </select>
+            </div>
+
+        </div>
+
+        <button onclick="analyzePatient()">
+            Analyze Patient
+        </button>
+    </div>
+
+
+    <div class="card" id="result">
+
+        <h2>Risk Assessment</h2>
+
+        <div class="risk" id="riskLevel"></div>
+
+        <p>
+            Risk Score:
+            <strong id="riskScore"></strong>
+        </p>
+
+        <h3>Warnings</h3>
+        <div id="warnings"></div>
+
+        <h3>Granite AI Analysis</h3>
+        <div id="aiResponse"></div>
+
+    </div>
+
+</div>
+
+
+<script>
+
+async function analyzePatient() {
+
+    const data = {
+        patient_id: document.getElementById("patient_id").value,
+        age: document.getElementById("age").value,
+        condition: document.getElementById("condition").value,
+        glucose: document.getElementById("glucose").value,
+        systolic_bp: document.getElementById("systolic_bp").value,
+        diastolic_bp: document.getElementById("diastolic_bp").value,
+        heart_rate: document.getElementById("heart_rate").value,
+        sleep_hours: document.getElementById("sleep_hours").value,
+        medication_adherence:
+            document.getElementById("medication_adherence").value
+    };
+
+    document.getElementById("result").style.display = "block";
+    document.getElementById("aiResponse").innerText =
+        "Analyzing patient data with ChronicCare AI...";
+
+    const response = await fetch("/analyze", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json"
+        },
+        body: JSON.stringify(data)
+    });
+
+    const result = await response.json();
+
+    document.getElementById("riskLevel").innerText =
+        result.risk.risk_level;
+
+    document.getElementById("riskScore").innerText =
+        result.risk.risk_score;
+
+    document.getElementById("warnings").innerHTML =
+        result.risk.warnings
+            .map(warning => `<div class="warning">⚠️ ${warning}</div>`)
+            .join("");
+
+    document.getElementById("aiResponse").innerText =
+        result.ai_response;
+}
+
+</script>
+
+</body>
+</html>

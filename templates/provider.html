@@ -1,0 +1,990 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ChronicCare AI — Provider Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+    <style>
+        /* ---- Reset & Base ---- */
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: -apple-system, "Segoe UI", Arial, sans-serif;
+            background: #f0f4f8;
+            color: #1e293b;
+            min-height: 100vh;
+        }
+
+        /* ---- Header ---- */
+        header {
+            background: #123c69;
+            color: #fff;
+            padding: 18px 36px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.18);
+        }
+        header .brand h1 { font-size: 1.45rem; font-weight: 700; letter-spacing: 0.3px; }
+        header .brand p  { font-size: 0.82rem; opacity: 0.82; margin-top: 2px; }
+        header nav a {
+            color: rgba(255,255,255,0.78);
+            text-decoration: none;
+            font-size: 0.88rem;
+            margin-left: 8px;
+            padding: 6px 14px;
+            border-radius: 6px;
+            transition: background 0.2s, color 0.2s;
+        }
+        header nav a:hover { color: #fff; background: rgba(255,255,255,0.12); }
+        header nav a.active {
+            color: #fff;
+            font-weight: 700;
+            background: rgba(255,255,255,0.18);
+            border-bottom: 2px solid #60a5fa;
+            padding-bottom: 4px;
+        }
+        /* ---- Synthetic demo badge ---- */
+        .demo-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            font-size: 0.72rem;
+            font-weight: 600;
+            color: rgba(255,255,255,0.65);
+            background: rgba(255,255,255,0.1);
+            border: 1px solid rgba(255,255,255,0.2);
+            border-radius: 20px;
+            padding: 3px 10px;
+            letter-spacing: 0.3px;
+            margin-left: 16px;
+        }
+
+        /* ---- Layout ---- */
+        .page { max-width: 1400px; margin: 0 auto; padding: 28px 24px 48px; }
+
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: 420px 1fr;
+            gap: 22px;
+            align-items: start;
+        }
+
+        /* ---- Cards ---- */
+        .card {
+            background: #fff;
+            border-radius: 12px;
+            padding: 22px 24px;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.07), 0 4px 16px rgba(0,0,0,0.05);
+        }
+        .card-title {
+            font-size: 0.78rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.6px;
+            color: #64748b;
+            margin-bottom: 14px;
+        }
+
+        /* ---- Patient table ---- */
+        .patient-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.875rem;
+        }
+        .patient-table thead th {
+            text-align: left;
+            padding: 9px 10px;
+            font-size: 0.75rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: #64748b;
+            border-bottom: 2px solid #e2e8f0;
+            background: #f8fafc;
+        }
+        .patient-table tbody tr {
+            cursor: pointer;
+            border-bottom: 1px solid #f1f5f9;
+            transition: background 0.15s;
+        }
+        .patient-table tbody tr:hover { background: #eff6ff; }
+        .patient-table tbody tr.active { background: #dbeafe; }
+        .patient-table tbody td {
+            padding: 11px 10px;
+            vertical-align: middle;
+        }
+        .patient-name { font-weight: 600; color: #1e293b; }
+        .patient-id   { font-size: 0.78rem; color: #94a3b8; margin-top: 1px; }
+        .condition-tag {
+            display: inline-block;
+            font-size: 0.75rem;
+            font-weight: 600;
+            padding: 2px 8px;
+            border-radius: 20px;
+            background: #e0f2fe;
+            color: #0369a1;
+        }
+        .condition-tag.hypertension { background: #fce7f3; color: #9d174d; }
+        .condition-tag.heart        { background: #fee2e2; color: #991b1b; }
+
+        /* ---- Risk badges (table + detail) ---- */
+        .risk-pill {
+            display: inline-block;
+            font-size: 0.78rem;
+            font-weight: 700;
+            padding: 3px 11px;
+            border-radius: 20px;
+        }
+        .risk-pill.risk-critical { font-size: 0.8rem; padding: 4px 13px; }
+        .risk-low      { background: #dcfce7; color: #15803d; }
+        .risk-moderate { background: #fef9c3; color: #854d0e; }
+        .risk-high     { background: #ffedd5; color: #9a3412; }
+        .risk-critical { background: #fee2e2; color: #991b1b; }
+        .risk-pending  { background: #f1f5f9; color: #64748b; }
+
+        /* ---- Detail panel ---- */
+        .detail-placeholder {
+            text-align: center;
+            padding: 64px 24px;
+            color: #94a3b8;
+        }
+        .detail-placeholder svg { opacity: 0.25; margin-bottom: 12px; }
+        .detail-placeholder p { font-size: 0.92rem; }
+
+        /* ---- Alert banner ---- */
+        .alert-banner {
+            display: none;
+            background: #fff1f2;
+            border: 1px solid #fca5a5;
+            border-left: 5px solid #dc2626;
+            border-radius: 8px;
+            padding: 14px 16px;
+            margin-bottom: 16px;
+            font-size: 0.88rem;
+            font-weight: 600;
+            color: #991b1b;
+            align-items: center;
+            gap: 10px;
+            box-shadow: 0 2px 8px rgba(220,38,38,0.12);
+        }
+        .alert-banner.visible { display: flex; }
+        .alert-banner-icon { font-size: 1.35rem; flex-shrink: 0; }
+        /* Critical gets an even stronger background */
+        .alert-banner.critical {
+            background: #fef2f2;
+            border-left-color: #b91c1c;
+            box-shadow: 0 2px 12px rgba(185,28,28,0.2);
+        }
+
+        /* ---- Risk summary header inside detail ---- */
+        .risk-summary-row {
+            display: flex;
+            align-items: center;
+            gap: 18px;
+            margin-bottom: 16px;
+            flex-wrap: wrap;
+        }
+        .risk-circle {
+            width: 92px;
+            height: 92px;
+            border-radius: 50%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            border: 5px solid transparent;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .risk-circle .circle-level { font-size: 1.05rem; font-weight: 900; letter-spacing: -0.3px; }
+        .risk-circle .circle-score { font-size: 0.76rem; font-weight: 700; opacity: 0.9; margin-top: 2px; }
+
+        .risk-circle.risk-low      { background: #dcfce7; border-color: #16a34a; color: #15803d; }
+        .risk-circle.risk-moderate { background: #fef9c3; border-color: #ca8a04; color: #854d0e; }
+        .risk-circle.risk-high     { background: #ffedd5; border-color: #ea580c; color: #9a3412; }
+        .risk-circle.risk-critical { background: #fee2e2; border-color: #dc2626; color: #991b1b; box-shadow: 0 0 0 3px rgba(220,38,38,0.18); }
+        .risk-circle.risk-pending  { background: #f1f5f9; border-color: #94a3b8; color: #64748b; }
+
+        .risk-meta h3 { font-size: 1.05rem; font-weight: 700; margin-bottom: 6px; }
+
+        /* ---- Warnings list ---- */
+        .warnings-list { list-style: none; }
+        .warnings-list li {
+            display: flex;
+            align-items: center;
+            gap: 7px;
+            font-size: 0.855rem;
+            padding: 5px 0;
+            color: #374151;
+            border-bottom: 1px solid #f1f5f9;
+        }
+        .warnings-list li:last-child { border-bottom: none; }
+        .warn-dot {
+            width: 7px; height: 7px;
+            border-radius: 50%;
+            background: #f97316;
+            flex-shrink: 0;
+        }
+        .no-warnings { font-size: 0.86rem; color: #22c55e; display: flex; align-items: center; gap: 6px; }
+
+        /* ---- Trends row ---- */
+        .trends-row {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 8px;
+            margin: 14px 0;
+        }
+        .trend-item {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 9px 10px;
+            text-align: center;
+        }
+        .trend-label { font-size: 0.74rem; color: #64748b; font-weight: 600; margin-bottom: 4px; }
+        .trend-value {
+            font-size: 0.8rem;
+            font-weight: 700;
+            padding: 2px 8px;
+            border-radius: 20px;
+            display: inline-block;
+        }
+        .trend-increasing { background: #fee2e2; color: #dc2626; }
+        .trend-decreasing { background: #fee2e2; color: #dc2626; }
+        .trend-stable     { background: #dcfce7; color: #16a34a; }
+        .trend-improving  { background: #dcfce7; color: #16a34a; }
+        .trend-na         { background: #f1f5f9; color: #94a3b8; }
+
+        /* ---- AI label chip ---- */
+        .ai-label-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            font-size: 0.7rem;
+            font-weight: 700;
+            letter-spacing: 0.4px;
+            color: #1d4ed8;
+            background: #dbeafe;
+            border: 1px solid #bfdbfe;
+            border-radius: 20px;
+            padding: 2px 8px;
+            text-transform: uppercase;
+            vertical-align: middle;
+            margin-left: 6px;
+        }
+        /* ---- AI Summary box ---- */
+        .ai-box {
+            background: #f8fafc;
+            border: 1px solid #cbd5e1;
+            border-top: 3px solid #3b82f6;
+            border-radius: 8px;
+            padding: 14px 16px;
+            font-size: 0.875rem;
+            line-height: 1.75;
+            color: #1e293b;
+            white-space: pre-wrap;
+            min-height: 56px;
+            margin-top: 10px;
+        }
+        .ai-loading { color: #3b82f6; animation: pulse 1.2s infinite; }
+        @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.45} }
+        .ai-placeholder { color: #94a3b8; font-style: italic; }
+
+        /* ---- Generate alert button ---- */
+        .btn-alert {
+            display: none;
+            margin-top: 14px;
+            padding: 10px 22px;
+            background: #dc2626;
+            color: #fff;
+            border: none;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: background 0.2s, transform 0.1s;
+            letter-spacing: 0.2px;
+        }
+        .btn-alert:hover  { background: #b91c1c; }
+        .btn-alert:active { transform: scale(0.98); }
+        .btn-alert:disabled { background: #9ca3af; cursor: not-allowed; }
+        .btn-alert.visible { display: inline-block; }
+
+        /* ---- Alert card ---- */
+        .alert-card {
+            display: none;
+            margin-top: 16px;
+            background: #fff;
+            border: 1px solid #fca5a5;
+            border-left: 5px solid #dc2626;
+            border-radius: 10px;
+            padding: 18px 20px;
+            box-shadow: 0 2px 8px rgba(220,38,38,0.08);
+        }
+        .alert-card.visible { display: block; }
+        .alert-card.critical-alert {
+            border-left-color: #b91c1c;
+            border-left-width: 7px;
+            box-shadow: 0 2px 12px rgba(185,28,28,0.15);
+        }
+        .alert-card-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 12px;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+        .alert-card-header h4 { font-size: 1rem; font-weight: 700; color: #991b1b; }
+        .alert-timestamp { font-size: 0.76rem; color: #94a3b8; }
+        .alert-meta-row { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 10px; }
+        .alert-meta-item { font-size: 0.82rem; color: #64748b; }
+        .alert-meta-item strong { color: #1e293b; }
+        .alert-message {
+            font-size: 0.855rem;
+            color: #374151;
+            background: #fff1f2;
+            border-radius: 6px;
+            padding: 10px 13px;
+            line-height: 1.6;
+        }
+        .alert-warnings-list { list-style: none; margin-top: 10px; }
+        .alert-warnings-list li {
+            display: flex; align-items: center; gap: 7px;
+            font-size: 0.84rem; color: #374151; padding: 4px 0;
+            border-bottom: 1px solid #f1f5f9;
+        }
+        .alert-warnings-list li:last-child { border-bottom: none; }
+
+        /* ---- Charts inside detail ---- */
+        .charts-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 16px;
+            margin-top: 18px;
+        }
+        .chart-card {
+            background: #fff;
+            border-radius: 10px;
+            padding: 16px 18px 12px;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.07);
+        }
+        .chart-card h4 {
+            font-size: 0.84rem;
+            font-weight: 700;
+            color: #374151;
+            margin-bottom: 10px;
+        }
+        .chart-wrap { position: relative; height: 170px; }
+
+        /* ---- Loading spinner ---- */
+        .spinner-overlay {
+            display: none;
+            text-align: center;
+            padding: 48px 0;
+            color: #64748b;
+            font-size: 0.9rem;
+        }
+        .spinner-overlay.visible { display: block; }
+
+        /* ---- Disclaimer ---- */
+        .disclaimer {
+            font-size: 0.78rem;
+            color: #64748b;
+            text-align: center;
+            margin-top: 36px;
+            padding: 16px 20px;
+            border-top: 1px solid #e2e8f0;
+            background: #f8fafc;
+            border-radius: 8px;
+        }
+        .disclaimer strong { color: #374151; }
+
+        /* ---- Responsive ---- */
+        @media (max-width: 1024px) {
+            .dashboard-grid { grid-template-columns: 1fr; }
+            .trends-row { grid-template-columns: repeat(2, 1fr); }
+        }
+        @media (max-width: 640px) {
+            .charts-grid { grid-template-columns: 1fr; }
+            .trends-row  { grid-template-columns: repeat(2, 1fr); }
+        }
+    </style>
+</head>
+<body>
+
+<!-- ===================== HEADER ===================== -->
+<header>
+    <div class="brand">
+        <h1>ChronicCare AI</h1>
+        <p>AI-Powered Chronic Disease Monitoring System</p>
+    </div>
+    <div style="display:flex;align-items:center;gap:4px;flex-wrap:wrap;">
+        <span class="demo-badge">&#128202; Synthetic Demo Data</span>
+        <nav>
+            <a href="/patient">Patient Dashboard</a>
+            <a href="/provider" class="active">Provider View</a>
+        </nav>
+    </div>
+</header>
+
+<!-- ===================== PAGE ===================== -->
+<div class="page">
+
+    <!-- Page heading -->
+    <div style="margin-bottom:20px;display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;">
+        <h2 style="font-size:1.25rem;font-weight:700;color:#1e293b;">Clinical Provider Dashboard</h2>
+        <span style="font-size:0.72rem;font-weight:600;color:#64748b;background:#e2e8f0;border-radius:20px;padding:2px 10px;letter-spacing:0.3px;">
+            Synthetic Demo Data
+        </span>
+        <p style="font-size:0.85rem;color:#64748b;width:100%;margin-top:2px;">
+            Click a patient row to load trend charts and run clinical risk analysis.
+        </p>
+    </div>
+
+    <div class="dashboard-grid">
+
+        <!-- ====== LEFT: Patient Summary Table ====== -->
+        <div>
+            <div class="card">
+                <div class="card-title">Patient Registry</div>
+                <table class="patient-table" id="patientTable">
+                    <thead>
+                        <tr>
+                            <th>Patient</th>
+                            <th>Condition</th>
+                            <th>Age</th>
+                            <th>Clinical Risk</th>
+                        </tr>
+                    </thead>
+                    <tbody id="patientTableBody">
+                        <tr>
+                            <td colspan="4" style="text-align:center;color:#94a3b8;padding:20px;font-size:0.85rem;">
+                                Loading patients…
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- ====== RIGHT: Detail Panel ====== -->
+        <div id="detailPanel">
+
+            <!-- Placeholder shown before any patient is selected -->
+            <div class="card detail-placeholder" id="detailPlaceholder">
+                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="1.5"
+                     stroke-linecap="round" stroke-linejoin="round" style="display:block;margin:0 auto 12px;">
+                    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+                    <circle cx="9" cy="7" r="4"/>
+                    <path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/>
+                </svg>
+                <p>Select a patient from the registry to view clinical details, trend charts, and risk analysis.</p>
+            </div>
+
+            <!-- Loading indicator -->
+            <div class="spinner-overlay" id="spinnerOverlay">
+                <span class="ai-loading">Loading patient data and running risk analysis…</span>
+            </div>
+
+            <!-- Active detail content (hidden until patient is selected) -->
+            <div id="detailContent" style="display:none;">
+
+                <!-- Patient header bar -->
+                <div class="card" style="margin-bottom:16px;">
+                    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;">
+                        <div>
+                            <div style="font-size:1.1rem;font-weight:700;color:#1e293b;" id="detailName">—</div>
+                            <div style="font-size:0.83rem;color:#64748b;margin-top:2px;" id="detailMeta">—</div>
+                        </div>
+                        <span id="detailConditionTag" class="condition-tag">—</span>
+                    </div>
+                </div>
+
+                <!-- Alert banner (shown for High / Critical) -->
+                <div class="alert-banner" id="alertBanner">
+                    <span class="alert-banner-icon">🚨</span>
+                    <span id="alertBannerText">This patient has reached a high clinical risk level. Immediate review is recommended.</span>
+                </div>
+
+                <!-- Risk assessment -->
+                <div class="card" style="margin-bottom:16px;">
+                    <div class="card-title">Clinical Risk Assessment</div>
+
+                    <div class="risk-summary-row">
+                        <div class="risk-circle risk-pending" id="detailRiskCircle">
+                            <span class="circle-level" id="detailRiskLevel">—</span>
+                            <span class="circle-score" id="detailRiskScore"></span>
+                        </div>
+                        <div class="risk-meta">
+                            <h3 id="detailRiskHeading">Analysis pending</h3>
+                            <ul class="warnings-list" id="detailWarningsList">
+                                <li><span style="color:#94a3b8;font-size:0.84rem;">Running analysis…</span></li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <!-- Detected trends row -->
+                    <div class="card-title" style="margin-top:14px;">Detected Trends <span style="font-weight:400;text-transform:none;letter-spacing:0;">(historical)</span></div>
+                    <div class="trends-row">
+                        <div class="trend-item">
+                            <div class="trend-label">Glucose</div>
+                            <span class="trend-value trend-na" id="trendGlucose">—</span>
+                        </div>
+                        <div class="trend-item">
+                            <div class="trend-label">Blood Pressure</div>
+                            <span class="trend-value trend-na" id="trendBP">—</span>
+                        </div>
+                        <div class="trend-item">
+                            <div class="trend-label">Heart Rate</div>
+                            <span class="trend-value trend-na" id="trendHR">—</span>
+                        </div>
+                        <div class="trend-item">
+                            <div class="trend-label">Sleep</div>
+                            <span class="trend-value trend-na" id="trendSleep">—</span>
+                        </div>
+                    </div>
+
+                    <!-- Granite AI clinical summary -->
+                    <div class="card-title" style="margin-top:16px;">
+                        Granite AI Clinical Summary
+                        <span class="ai-label-chip">&#129302; AI Monitoring Insight</span>
+                    </div>
+                    <p style="font-size:0.76rem;color:#64748b;margin-bottom:2px;line-height:1.5;">
+                        Generated by <strong>IBM Granite 4-H Small</strong> via watsonx.ai &mdash; a monitoring aid, not a medical diagnosis.
+                    </p>
+                    <div class="ai-box" id="detailAiBox">
+                        <span class="ai-placeholder">Waiting for analysis…</span>
+                    </div>
+
+                    <!-- Generate Alert button -->
+                    <button class="btn-alert" id="generateAlertBtn" onclick="generateAlert()">
+                        🔔 Generate Provider Alert
+                    </button>
+                </div>
+
+                <!-- Alert card (rendered after Generate Alert is clicked) -->
+                <div class="alert-card" id="alertCard">
+                    <div class="alert-card-header">
+                        <h4 id="alertCardTitle">Provider Alert</h4>
+                        <span class="alert-timestamp" id="alertTimestamp">—</span>
+                    </div>
+                    <div class="alert-meta-row">
+                        <div class="alert-meta-item"><strong>Patient: </strong><span id="alertPatientId">—</span></div>
+                        <div class="alert-meta-item"><strong>Condition: </strong><span id="alertCondition">—</span></div>
+                        <div class="alert-meta-item"><strong>Risk Level: </strong><span id="alertRiskLevel">—</span></div>
+                        <div class="alert-meta-item"><strong>Score: </strong><span id="alertScore">—</span>/7</div>
+                    </div>
+                    <ul class="alert-warnings-list" id="alertWarningsList"></ul>
+                    <div class="alert-message" id="alertMessage">—</div>
+                </div>
+
+                <!-- Trend charts -->
+                <div class="charts-grid">
+                    <div class="chart-card">
+                        <h4>Glucose <span style="font-weight:400;color:#94a3b8;">(mg/dL)</span></h4>
+                        <div class="chart-wrap"><canvas id="chartGlucose"></canvas></div>
+                    </div>
+                    <div class="chart-card">
+                        <h4>Blood Pressure <span style="font-weight:400;color:#94a3b8;">(mmHg)</span></h4>
+                        <div class="chart-wrap"><canvas id="chartBP"></canvas></div>
+                    </div>
+                    <div class="chart-card">
+                        <h4>Heart Rate <span style="font-weight:400;color:#94a3b8;">(bpm)</span></h4>
+                        <div class="chart-wrap"><canvas id="chartHR"></canvas></div>
+                    </div>
+                    <div class="chart-card">
+                        <h4>Sleep Duration <span style="font-weight:400;color:#94a3b8;">(hours)</span></h4>
+                        <div class="chart-wrap"><canvas id="chartSleep"></canvas></div>
+                    </div>
+                </div>
+
+            </div><!-- /detailContent -->
+        </div><!-- /detailPanel -->
+
+    </div><!-- /dashboard-grid -->
+
+    <div class="disclaimer">
+        <strong>&#9888; ChronicCare AI is a monitoring and decision-support tool</strong> using synthetic demo data only.<br>
+        It does not diagnose diseases, prescribe medication, or replace qualified healthcare professionals.
+        Always consult a qualified clinician for medical decisions.
+    </div>
+
+</div><!-- /page -->
+
+<!-- ===================== JAVASCRIPT ===================== -->
+<script>
+"use strict";
+
+// ---- Chart instances ----
+const charts = { glucose: null, bp: null, hr: null, sleep: null };
+
+// ---- Chart.js shared defaults ----
+const CHART_DEFAULTS = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+        legend: { display: true, position: "top", labels: { font: { size: 11 }, boxWidth: 14, padding: 10 } },
+        tooltip: { mode: "index", intersect: false }
+    },
+    scales: {
+        x: {
+            grid: { color: "#f1f5f9" },
+            ticks: { font: { size: 11 } },
+            title: { display: true, text: "Date", font: { size: 11 }, color: "#94a3b8" }
+        },
+        y: {
+            grid: { color: "#f1f5f9" },
+            ticks: { font: { size: 11 } },
+            beginAtZero: false,
+            title: { display: true, font: { size: 11 }, color: "#94a3b8" }
+        }
+    },
+    elements: { point: { radius: 4, hoverRadius: 6 }, line: { tension: 0.35 } }
+};
+
+// ---- Per-chart Y-axis unit labels ----
+const CHART_Y_LABELS = {
+    chartGlucose: "mg/dL",
+    chartBP:      "mmHg",
+    chartHR:      "bpm",
+    chartSleep:   "hours"
+};
+
+// ---- State ----
+let currentPatient    = null;   // {patient_id, name, age, condition}
+let currentLastRow    = null;   // last CSV row for selected patient
+let currentRiskResult = null;   // last /analyze response
+
+// ---- Helpers ----
+function riskClass(level) {
+    const map = { Low: "risk-low", Moderate: "risk-moderate", High: "risk-high", Critical: "risk-critical" };
+    return map[level] || "risk-pending";
+}
+
+function trendClass(value) {
+    if (!value || value === "—") return "trend-na";
+    const map = {
+        Increasing: "trend-increasing",
+        Decreasing: "trend-decreasing",
+        Stable:     "trend-stable",
+        Improving:  "trend-improving"
+    };
+    return map[value] || "trend-na";
+}
+
+function trendArrow(value) {
+    if (value === "Increasing") return "↑ ";
+    if (value === "Decreasing") return "↓ ";
+    if (value === "Improving")  return "↑ ";
+    if (value === "Stable")     return "→ ";
+    return "";
+}
+
+function conditionTagClass(condition) {
+    if (condition === "Hypertension")    return "condition-tag hypertension";
+    if (condition === "Heart Condition") return "condition-tag heart";
+    return "condition-tag";
+}
+
+function formatTimestamp(isoString) {
+    if (!isoString) return "—";
+    try {
+        const d = new Date(isoString);
+        return d.toUTCString().replace("GMT", "UTC");
+    } catch (e) { return isoString; }
+}
+
+// ---- Build a Chart.js line chart ----
+function buildChart(canvasId, labels, datasets) {
+    const ctx  = document.getElementById(canvasId).getContext("2d");
+    const opts = JSON.parse(JSON.stringify(CHART_DEFAULTS));
+    if (CHART_Y_LABELS[canvasId]) {
+        opts.scales.y.title.text = CHART_Y_LABELS[canvasId];
+    }
+    return new Chart(ctx, { type: "line", data: { labels, datasets }, options: opts });
+}
+
+// ---- Render all 4 trend charts ----
+function renderCharts(history) {
+    if (!history || history.length === 0) return;
+
+    const labels      = history.map(r => r.date);
+    const glucose     = history.map(r => parseFloat(r.glucose));
+    const systolicBP  = history.map(r => parseFloat(r.systolic_bp));
+    const diastolicBP = history.map(r => parseFloat(r.diastolic_bp));
+    const heartRate   = history.map(r => parseFloat(r.heart_rate));
+    const sleepHours  = history.map(r => parseFloat(r.sleep_hours));
+
+    Object.keys(charts).forEach(k => { if (charts[k]) { charts[k].destroy(); charts[k] = null; } });
+
+    charts.glucose = buildChart("chartGlucose", labels, [{
+        label: "Glucose",
+        data: glucose,
+        borderColor: "#3b82f6",
+        backgroundColor: "rgba(59,130,246,0.08)",
+        fill: true
+    }]);
+
+    charts.bp = buildChart("chartBP", labels, [
+        { label: "Systolic",  data: systolicBP,  borderColor: "#ef4444", backgroundColor: "rgba(239,68,68,0.06)",   fill: false },
+        { label: "Diastolic", data: diastolicBP, borderColor: "#f97316", backgroundColor: "rgba(249,115,22,0.06)",  fill: false }
+    ]);
+
+    charts.hr = buildChart("chartHR", labels, [{
+        label: "Heart Rate",
+        data: heartRate,
+        borderColor: "#ec4899",
+        backgroundColor: "rgba(236,72,153,0.08)",
+        fill: true
+    }]);
+
+    charts.sleep = buildChart("chartSleep", labels, [{
+        label: "Sleep Hours",
+        data: sleepHours,
+        borderColor: "#8b5cf6",
+        backgroundColor: "rgba(139,92,246,0.08)",
+        fill: true
+    }]);
+}
+
+// ---- Update the detected-trends row ----
+function renderTrends(trends) {
+    function set(elId, value) {
+        const el = document.getElementById(elId);
+        el.textContent = value ? trendArrow(value) + value : "—";
+        el.className   = "trend-value " + trendClass(value);
+    }
+    set("trendGlucose", trends.glucose);
+    set("trendBP",      trends.blood_pressure);
+    set("trendHR",      trends.heart_rate);
+    set("trendSleep",   trends.sleep);
+}
+
+// ---- Populate patient table from /api/patients ----
+async function loadPatientList() {
+    try {
+        const res      = await fetch("/api/patients");
+        const patients = await res.json();
+        const tbody    = document.getElementById("patientTableBody");
+        tbody.innerHTML = "";
+
+        patients.forEach(p => {
+            const tr = document.createElement("tr");
+            tr.dataset.patient = JSON.stringify(p);
+            tr.innerHTML = `
+                <td>
+                    <div class="patient-name">${p.name}</div>
+                    <div class="patient-id">${p.patient_id}</div>
+                </td>
+                <td><span class="${conditionTagClass(p.condition)}">${p.condition}</span></td>
+                <td>${p.age}</td>
+                <td><span class="risk-pill risk-pending" id="rowRisk_${p.patient_id}">Pending</span></td>
+            `;
+            tr.addEventListener("click", () => selectPatient(p, tr));
+            tbody.appendChild(tr);
+        });
+    } catch (e) {
+        console.error("Failed to load patient list:", e);
+    }
+}
+
+// ---- Handle patient row click ----
+async function selectPatient(patient, rowEl) {
+    // Highlight selected row
+    document.querySelectorAll("#patientTableBody tr").forEach(r => r.classList.remove("active"));
+    rowEl.classList.add("active");
+
+    currentPatient    = patient;
+    currentLastRow    = null;
+    currentRiskResult = null;
+
+    // Show spinner, hide placeholder and previous content
+    document.getElementById("detailPlaceholder").style.display = "none";
+    document.getElementById("detailContent").style.display     = "none";
+    document.getElementById("spinnerOverlay").classList.add("visible");
+
+    // Reset alert card and button
+    document.getElementById("alertCard").classList.remove("visible");
+    document.getElementById("generateAlertBtn").classList.remove("visible");
+    document.getElementById("alertBanner").classList.remove("visible");
+
+    try {
+        // 1. Load history (for charts)
+        const histRes  = await fetch("/api/history/" + encodeURIComponent(patient.patient_id));
+        const history  = await histRes.json();
+
+        if (history.length > 0) {
+            currentLastRow = history[history.length - 1];
+        }
+
+        // 2. Post last-row vitals to /analyze
+        const analyzePayload = {
+            patient_id:           patient.patient_id,
+            name:                 patient.name,
+            age:                  patient.age,
+            condition:            patient.condition,
+            glucose:              currentLastRow ? currentLastRow.glucose              : 100,
+            systolic_bp:          currentLastRow ? currentLastRow.systolic_bp          : 120,
+            diastolic_bp:         currentLastRow ? currentLastRow.diastolic_bp         : 80,
+            heart_rate:           currentLastRow ? currentLastRow.heart_rate           : 72,
+            sleep_hours:          currentLastRow ? currentLastRow.sleep_hours          : 7,
+            medication_adherence: currentLastRow ? currentLastRow.medication_adherence : "Taken"
+        };
+
+        const analyzeRes = await fetch("/analyze", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(analyzePayload)
+        });
+
+        const result = await analyzeRes.json();
+        currentRiskResult = result;
+
+        // Hide spinner, show detail
+        document.getElementById("spinnerOverlay").classList.remove("visible");
+        document.getElementById("detailContent").style.display = "block";
+
+        // 3. Populate patient header
+        document.getElementById("detailName").textContent = patient.name;
+        document.getElementById("detailMeta").textContent =
+            `Patient ID: ${patient.patient_id}  ·  Age: ${patient.age}  ·  Last reading: ${currentLastRow ? currentLastRow.date : "—"}`;
+        const tagEl = document.getElementById("detailConditionTag");
+        tagEl.textContent = patient.condition;
+        tagEl.className   = conditionTagClass(patient.condition);
+
+        // 4. Risk circle + warnings
+        const level  = result.risk.risk_level;
+        const circle = document.getElementById("detailRiskCircle");
+        circle.className = "risk-circle " + riskClass(level);
+        document.getElementById("detailRiskLevel").textContent   = level;
+        document.getElementById("detailRiskScore").textContent   = "Score: " + result.risk.risk_score + " / 7";
+        document.getElementById("detailRiskHeading").textContent = level + " Clinical Risk";
+
+        const wList = document.getElementById("detailWarningsList");
+        if (result.risk.warnings && result.risk.warnings.length > 0) {
+            wList.innerHTML = result.risk.warnings.map(w =>
+                `<li><span class="warn-dot"></span>${w}</li>`
+            ).join("");
+        } else {
+            wList.innerHTML = "<li class='no-warnings'>✓ No active clinical warnings</li>";
+        }
+
+        // 5. Trends
+        if (result.trends && typeof result.trends === "object" && !result.trends.message) {
+            renderTrends(result.trends);
+        }
+
+        // 6. AI summary
+        const aiBox = document.getElementById("detailAiBox");
+        aiBox.textContent = result.ai_response || "No response from AI.";
+
+        // 7. Update risk pill in table row
+        const pill = document.getElementById("rowRisk_" + patient.patient_id);
+        if (pill) {
+            pill.textContent = level;
+            pill.className   = "risk-pill " + riskClass(level);
+        }
+
+        // 8. Alert banner + Generate Alert button for High / Critical
+        if (level === "High" || level === "Critical") {
+            const banner = document.getElementById("alertBanner");
+            document.getElementById("alertBannerText").textContent =
+                `${patient.name} has reached ${level} clinical risk (score ${result.risk.risk_score}/7). Immediate clinical review is recommended.`;
+            banner.classList.add("visible");
+            if (level === "Critical") {
+                banner.classList.add("critical");
+            } else {
+                banner.classList.remove("critical");
+            }
+            document.getElementById("generateAlertBtn").classList.add("visible");
+        }
+
+        // 9. Charts
+        renderCharts(history);
+
+    } catch (e) {
+        document.getElementById("spinnerOverlay").classList.remove("visible");
+        document.getElementById("detailContent").style.display = "block";
+        document.getElementById("detailAiBox").innerHTML =
+            "<span style='color:#ef4444;'>Error loading patient data. Check Flask server and .env credentials.</span>";
+        console.error(e);
+    }
+}
+
+// ---- Generate Provider Alert via /api/alert ----
+async function generateAlert() {
+    if (!currentPatient || !currentLastRow) return;
+
+    const btn = document.getElementById("generateAlertBtn");
+    btn.disabled    = true;
+    btn.textContent = "Generating…";
+
+    const payload = {
+        patient_id:           currentPatient.patient_id,
+        age:                  currentPatient.age,
+        condition:            currentPatient.condition,
+        glucose:              currentLastRow.glucose,
+        systolic_bp:          currentLastRow.systolic_bp,
+        diastolic_bp:         currentLastRow.diastolic_bp,
+        heart_rate:           currentLastRow.heart_rate,
+        sleep_hours:          currentLastRow.sleep_hours,
+        medication_adherence: currentLastRow.medication_adherence
+    };
+
+    try {
+        const res    = await fetch("/api/alert", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload)
+        });
+        const data   = await res.json();
+        const alert  = data.alert;
+
+        if (alert) {
+            document.getElementById("alertCardTitle").textContent  = "Provider Alert — " + currentPatient.name;
+            document.getElementById("alertTimestamp").textContent  = formatTimestamp(alert.timestamp);
+            document.getElementById("alertPatientId").textContent  = alert.patient_id;
+            document.getElementById("alertCondition").textContent  = alert.condition || currentPatient.condition;
+            document.getElementById("alertRiskLevel").innerHTML    =
+                `<span class="risk-pill ${riskClass(alert.risk_level)}">${alert.risk_level}</span>`;
+            document.getElementById("alertScore").textContent      = alert.risk_score;
+            document.getElementById("alertMessage").textContent    = alert.message;
+
+            const wl = document.getElementById("alertWarningsList");
+            if (alert.warnings && alert.warnings.length > 0) {
+                wl.innerHTML = alert.warnings.map(w =>
+                    `<li><span class="warn-dot" style="background:#ef4444;"></span>${w}</li>`
+                ).join("");
+            } else {
+                wl.innerHTML = "<li style='color:#94a3b8;font-size:0.84rem;'>No specific warnings.</li>";
+            }
+
+            const alertCard = document.getElementById("alertCard");
+            alertCard.classList.add("visible");
+            if (alert.risk_level === "Critical") {
+                alertCard.classList.add("critical-alert");
+            } else {
+                alertCard.classList.remove("critical-alert");
+            }
+        } else {
+            // Should not reach here for High/Critical, but handle gracefully
+            btn.textContent = "No Alert Generated";
+        }
+    } catch (e) {
+        console.error("Alert generation failed:", e);
+        btn.textContent = "Error — Retry";
+    } finally {
+        btn.disabled    = false;
+        if (btn.textContent === "Generating…") btn.textContent = "🔔 Generate Provider Alert";
+    }
+}
+
+// ---- Init ----
+window.addEventListener("DOMContentLoaded", loadPatientList);
+</script>
+
+</body>
+</html>
